@@ -10,13 +10,34 @@
 struct sock *nl_sk = NULL;
 EXPORT_SYMBOL_GPL(nl_sk);
 
+void send_to_user(char *str, u32 pid)
+{
+  struct sk_buff *skb;
+  struct nlmsghdr *nlh;
+  int rc;
+  int len = NLMSG_SPACE(1200);
+    skb = alloc_skb(len, GFP_ATOMIC);
+    if (!skb){
+      printk(KERN_ERR "net_link: allocate failed.\n");
+      return;
+    }
+    nlh = nlmsg_put(skb,0,0,0,1200,0);
+    NETLINK_CB(skb).portid = 0; 
+
+    memcpy(NLMSG_DATA(nlh), str, 15);
+    printk("net_link: going to send.\n");
+    rc = netlink_unicast(nl_sk, skb, pid, MSG_DONTWAIT);
+    if (rc < 0) {
+      printk(KERN_ERR "net_link: can not unicast skb (%d)\n", rc);
+    }
+
+
+}
 void nl_data_ready (struct sk_buff *__skb)
 {
   struct sk_buff *skb;
   struct nlmsghdr *nlh;
   u32 pid;
-  int rc;
-  int len = NLMSG_SPACE(1200);
   char str[100];
 
   printk("net_link: data is ready to read.\n");
@@ -29,21 +50,7 @@ void nl_data_ready (struct sk_buff *__skb)
     pid = nlh->nlmsg_pid; 
     printk("net_link: pid is %d\n", pid);
     kfree_skb(skb);
-
-    skb = alloc_skb(len, GFP_ATOMIC);
-    if (!skb){
-      printk(KERN_ERR "net_link: allocate failed.\n");
-      return;
-    }
-    nlh = nlmsg_put(skb,0,0,0,1200,0);
-    NETLINK_CB(skb).portid = 0; 
-
-    memcpy(NLMSG_DATA(nlh), str, sizeof(str));
-    printk("net_link: going to send.\n");
-    rc = netlink_unicast(nl_sk, skb, pid, MSG_DONTWAIT);
-    if (rc < 0) {
-      printk(KERN_ERR "net_link: can not unicast skb (%d)\n", rc);
-    }
+	send_to_user("hello1", pid);
     printk("net_link: send is ok.\n");
   }
   return;
